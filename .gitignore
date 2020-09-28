@@ -1,4 +1,5 @@
 */*.db
 *.db
+*/build/
 /build/
-/.vscode/
+.vscode/
