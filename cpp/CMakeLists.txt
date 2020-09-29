@@ -33,10 +33,10 @@ link_directories(
 )
 
 aux_source_directory(
-    ./src  SRC
+    src/  SRC
 )
 
-add_executable(Task testUnorder.cc
+add_executable(Task testSimplex.cc
     ${SRC}
 )
 

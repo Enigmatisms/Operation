@@ -2,27 +2,9 @@
 #include <Eigen/Dense>
 #include <iostream>
 #include <vector>
+#include "./include/prints.hpp"
 
 std::vector<int> baseIndex;
-
-template <typename T, int m, int n>
-void printMat(const Eigen::Matrix<T, m, n>& mat){
-    for (int i = 0; i < m; i++){
-        for (int j = 0; j < n; j++){
-            std::cout << mat(i, j) << ", "; 
-        }
-        std::cout << std::endl;
-    }
-}
-
-void printMat(const Eigen::MatrixXd& mat){
-    for (int i = 0; i < mat.rows(); i++){
-        for (int j = 0; j < mat.cols(); j++){
-            std::cout << mat(i, j) << ", "; 
-        }
-        std::cout << std::endl;
-    }
-}
 
 void triangularize(Eigen::MatrixXd& B){
     int _m = B.rows();
@@ -63,15 +45,11 @@ void triangularize(Eigen::MatrixXd& B){
 
 int main(){
     std::cout << "==================== test ladderize ==================\n";
-    int row = 7, col = 12;
+    int row = 3, col = 6;
     Eigen::MatrixXd mat(row, col);
-    mat << 0, 4, -12, 2, -2, 5, 3, 2, 1 -4, -2, 0,
-        3, -1, -6, -2, 8, 0, 0, 3, -1, 1, 1, 0,
-        -1, -1, 6, 2, 0, 0, 1, -1, 0, -3, -3, -3,
-        2, 4, -5, -6, -7, -2, 2, 3, 4, 5, 6, 7,
-        1, 0, 2, 1, 3, 0, 6, -6, -2, -1, 0, 3, 
-        7, 2, 9, -1, 0, 0, 0, 0, 0, 3, 2, 1, 
-        2, 1, 8, 3, 6, 1, 2, 0, 2, 6, 0, 1;
+    mat << 1, -2, 1, 0, 0, 2,
+        0, 1, -3, 1, 0, 1,
+        0, 1, -1, 0, 1, 2;
     std::cout << "Before ladderize:\n";
     printMat(mat); 
     triangularize(mat);
@@ -94,7 +72,5 @@ int main(){
     Eigen::MatrixXd res = Binv * mat;
     std::cout << "Result:\n";
     printMat(res);
-    std::cout << "B mul Binv:\n";
-    printMat(B * Binv);
     return 0;
 }

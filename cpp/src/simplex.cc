@@ -1,78 +1,57 @@
-#ifndef __SIMPLEX_HPP__
-#define __SIMPLEX_HPP__
-#include <Eigen/Core>
-#include <Eigen/Dense>
-#include <iostream>
-#include <cmath>
-#include <vector>
-#include <unordered_set>
-#define INF 1e10
-#define EPSILON 1e-5
-
-
-class Simplex{
-public:
-    /// 输入目标函数向量（按照单纯形表首行格式）以及约束增广矩阵
-    Simplex(Eigen::RowVectorXd _tar, Eigen::MatrixXd _cstrn):
-        target(_tar), constrain(_cstrn), _m(_cstrn.rows()), _n(_cstrn.cols() - 1)
-    {
-        ;
-    }
-    ~Simplex();
-public:
-    bool solve();
-private:
-    // 起始情况：首先从增广矩阵中找到m个线性无关向量（使用阶梯化的方式）
-    // 此后取出这些列，拼合矩阵B，得到(B^-1)，继续使用对角化？
-    // 化为典式，函数退出
-    void getCanonical();   
-
-    // 阶梯化，Binv为阶梯化结果，得到矩阵B
-    void ladderize(Eigen::MatrixXd& B);
-    bool findBiggestInspect(int& index) const;
-private:
-    Eigen::RowVectorXd target;
-    Eigen::MatrixXd constrain;
-    int _m;
-    int _n;
-    std::vector<int> base_index;
-};
+#include "../include/simplex.hpp"
+#include "../include/prints.hpp"
 
 void Simplex::getCanonical(){
-    Eigen::MatrixXd B;
-    Eigen::Matrix4d test;
+    Eigen::MatrixXd B(_m, _m);
     ladderize(B);
+
+    
+    std::cout << "Ladderization completed.\n";
     Eigen::MatrixXd Binv = B.colPivHouseholderQr()
-        .solve(Eigen::MatrixXd::Identity(B.rows(), B.cols()));
-    constrain *= Binv;
+        .solve(Eigen::MatrixXd::Identity(_m, _m));
+    constrain = Binv * constrain;
     // 基变量检验数归0
-    for (int index: base_index){
-        if (target[index] != 0.0){
-            target -= constrain.row(index) * target[index];     
-        }
-    }   // 此for循环结束后，对应得到典式
+    std::cout << "Target before process:\n";
+    printMat(target);
+    for (size_t i = 0; i < _m; i++){
+        target -= constrain.row(i) * target(base_index[i]);
+    }
+    // for (int index: base_index){
+    //     if (target[index] != 0.0){
+    //         target -= constrain.row(index) * target[index];     
+    //     }
+    // }   // 此for循环结束后，对应得到典式
+    std::cout << "Constrains:\n";
+    printMat(constrain);
+    std::cout << "Target after process:\n";
+    printMat(target);
 }
 
 bool Simplex::solve(){
     getCanonical();
+    const Eigen::Block<Eigen::MatrixXd, -1, 1, true>& rhs = constrain.col(_n);          // RHS
+    // 无法应对循环情况
     while (true){
-        const Eigen::Block<Eigen::MatrixXd, -1, 1, true>& rhs = constrain.col(_n);          // RHS
         int ind = -1;
-        if (findBiggestInspect(ind) == false){                                              // 确定入基变量
+        if (findBiggestInspect(ind) == true){                                              // 确定入基变量
             std::cout << "All inspections are non-positive. Optimal solution found.\n";
             return true;
         }
         // 开始调整基 首先需要在Aj中寻找正分量，确定最大改变量
         // 以下：ind表示的是入基的非基变量，maxi_pos表示的是出基的基变量代表的行数
+        // 对入基列寻找最大改变量
         double maxi_pos = -1, maxi = INF;
-        const Eigen::Block<Eigen::MatrixXd, -1, 1, true>& column = constrain.col(ind);
+        const Eigen::Block<Eigen::MatrixXd, -1, 1, true>& column = constrain.col(ind);      // 入基列
         for (int r = 0; r < _m; r++){
-            if (column(r) > 0){
+            if (column(r) > EPSILON && rhs(r) > EPSILON){
                 double delta = rhs(r) / column(r);
-                if (delta < maxi){
+                if (delta < maxi){                  // 找到最大的改变量
                     maxi = delta;
                     maxi_pos = r;
                 } 
+            }
+            else if (rhs(r) <= EPSILON){
+                printf("RHS(%d) has odd result: %f\n", r, rhs(r));
             }
         }
         if (maxi_pos == -1){            // 对应Ai这一列所有元素全部小于0，也即x可以随意增大，问题无界
@@ -89,16 +68,23 @@ bool Simplex::solve(){
             base_index[maxi_pos] = ind;                         // 基索引存储更换
             // 入基完成
             target -= constrain.row(maxi_pos) * target[ind];    // 将新的基变量检验数（即ind位置对应的检验数）通过行变换变为0
+            counter[ind] ++;                                    // 入基次数自增
+            loop_cnt++;
+            if (isLooping()){
+                std::cout << "Simplex method is looping. Exiting...\n";
+                break;
+            }
         }
     }
+    return true;
 }
 
 void Simplex::ladderize(Eigen::MatrixXd& B){
     int start_row = 0;
-    for (int col = 1; col < _n; col ++){
+    for (int col = 0; col < _n + 1; col ++){
         int row = start_row;
         bool push_flag = false;
-        if (constrain(col, col) == 0.0){
+        if (constrain(row, col) == 0.0){
             for (; row < _m; row ++){
                 if (constrain(row, col) != 0.0){
                     constrain.row(col).swap(constrain.row(row));        // 为0和不为0行进行交换
@@ -109,29 +95,45 @@ void Simplex::ladderize(Eigen::MatrixXd& B){
             }
         }
         else{
+            row ++;
             push_flag = true;
         }
         for (; row < _m; row ++){
             double head = constrain(row, col);
             if (constrain(row, col) != 0.0){
-                constrain(row) -= head / constrain(col, col) * constrain(col);  // 消除头部0
+                constrain.row(row) -= head / constrain(col, col) * constrain.row(col);  // 消除头部0
             }
         }
         if (push_flag == true){
             base_index.emplace_back(col);
             start_row ++;
             if (start_row >= _m){
-                return;
+                break;
             }
         }
     }
+    if (base_index.size() < _m - 1){
+        std::cerr << "Error: Contrain is not a full-rank matrix in terms of rows.\n";
+    }
+    for (size_t i = 0; i < _m; i++){
+        B.col(i) = constrain.col(base_index[i]);
+    }
+}
+
+void Simplex::showResults() const{
+    printf("Minimal solution via Simplex method (One-stage): %lf\n\n", target(_n));
+    printf("For each x, they are:\n");
+    for (int i = 0; i < _m; i++){
+        printf("x%d = %lf, ", base_index[i], constrain(i, _n));
+    }
+    std::cout << std::endl;
 }
 
 bool Simplex::findBiggestInspect(int& index) const{
     bool all_minus = true;
     int maxi = EPSILON;
     for (int i = 0; i < _n; i++){
-        const double& val = target[i];
+        const double& val = target(i);
         if (val > EPSILON){
             all_minus = false;
             if (val > maxi){
@@ -143,9 +145,14 @@ bool Simplex::findBiggestInspect(int& index) const{
     return all_minus;
 }
 
-
-
-
-
-
-#endif  //__SIMPLEX_HPP__
+bool Simplex::isLooping() const{
+    if (loop_cnt < _m + 1){         // 循环次数过少时不判定
+        return false;
+    }
+    for (int i = 0; i < _m; i++){
+        if (counter[i] > 4){
+            return true;
+        }
+    }
+    return false;
+}
