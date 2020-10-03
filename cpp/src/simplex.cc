@@ -42,10 +42,12 @@ bool Simplex::stageOneOptimize(std::unordered_set<int>& slct){
                     maxi_pos = r;
                 } 
             }
-            else if (rhs(r) <= EPSILON){
-                printf("Stage one RHS(%d) has odd result: %f\n", r, rhs(r));
-            }
         }
+        std::cout << "In function [stageOneOptimize]: target and constrains are:\n";
+        std::cout << "Target:\n";
+        printMat(target);
+        std::cout << "Constrains: \n";
+        printMat(constrain);
         if (maxi_pos == -1){            // 对应Ai这一列所有元素全部小于0，也即x可以随意增大，问题无界
             std::cout << "No feasible result (from Stage One). Exiting...\n";
             return false;
@@ -60,8 +62,11 @@ bool Simplex::stageOneOptimize(std::unordered_set<int>& slct){
             // 入基完成
             target -= constrain.row(maxi_pos) * target[ind];    // 将新的基变量检验数（即ind位置对应的检验数）通过行变换变为0
             const std::unordered_set<int>::iterator& iter = slct.find(maxi_pos);
-            if (iter != slct.end()){
+            if (iter != slct.end()){        // 存在就删除
                 slct.erase(iter);
+            }
+            else{
+                std::cerr << "Error: Double deletion for artifacts.\n";
             }
             if (slct.size() < 1){
                 std::cout << "Stage one ended with no more artifacts.\n";
@@ -84,7 +89,7 @@ bool Simplex::doubleStageSolve(const Eigen::RowVectorXd& tar){
         const Eigen::Block<Eigen::MatrixXd, -1, 1, true>& column = constrain.col(col);
         int single = -1, break_flag = 0;
         for (int row = 0; row < _m; row ++){
-            if (column(row) != 0.0){
+            if (std::abs(column(row)) > EPSILON){
                 if (single == -1){
                     single = row;
                 }
@@ -95,17 +100,20 @@ bool Simplex::doubleStageSolve(const Eigen::RowVectorXd& tar){
             }
         }
         if (break_flag == 0 && single != -1){
-            if (selected.find(single) != selected.end()){
+            if (selected.find(single) == selected.end()){   // 未被加入
                 if (column(single) > EPSILON){
                     constrain.row(single) /= column(single);
+                    selected.emplace(single);
                 }
-                if (column(single) < -EPSILON && std::abs(rhs(single)) < EPSILON){
+                else if (column(single) < -EPSILON && std::abs(rhs(single)) < EPSILON){
                     constrain.row(single) *= -1.0;          // RHS位置为0并且单非零变量值小于0
+                    selected.emplace(single);               // selected 是原问题本身就携带的单位列向量
                 }
-                selected.emplace(single);
+                std::cout << "Emplace" << single << " when iterating " << col << std::endl;
             }
         }
     }
+    std::cout << "Original identity column number: " << selected.size() << std::endl;
     if (selected.size() == _m){                     // 原问题可以直接解，有_m个线性无关的单位列向量
         target = tar;
         return solve();
@@ -114,15 +122,21 @@ bool Simplex::doubleStageSolve(const Eigen::RowVectorXd& tar){
     // 此数组用于判断哪些行对应了人工变量，对应人工变量的都需要出基
     bool* is_artifacts = new bool[_m];              // 对应行包含的单位列向量为1的分量是否为人工变量
     for (int row = 0; row < _m; row ++){
-        if (selected.find(row) != selected.end()){
-            target -= constrain.row(row);          // 人工变量对应没有选中的行，则化人工变量（基）的检验数为0
+        if (selected.find(row) == selected.end()){  // 没有加入的变量为人工变量
+            target += constrain.row(row);           // 人工变量对应没有选中的行，则化人工变量（基）的检验数为0
             is_artifacts[row] = true;
         }
         else{
             is_artifacts[row] = false;
         }
     }
-    if (stageOneOptimize(selected) == true){
+    std::unordered_set<int> artis;
+    for (int i = 0; i < _m; i++){
+        if (selected.find(i) == selected.end()){
+            artis.emplace(i);
+        }
+    }
+    if (stageOneOptimize(artis) == true){
         target = tar;
         return solve();
     }
@@ -147,15 +161,12 @@ bool Simplex::solve(){
         double maxi_pos = -1, maxi = INF;
         const Eigen::Block<Eigen::MatrixXd, -1, 1, true>& column = constrain.col(ind);      // 入基列
         for (int r = 0; r < _m; r++){
-            if (column(r) > EPSILON && rhs(r) > EPSILON){
+            if (column(r) > EPSILON && rhs(r) > -EPSILON){
                 double delta = rhs(r) / column(r);
                 if (delta < maxi){                  // 找到最大的改变量
                     maxi = delta;
                     maxi_pos = r;
                 } 
-            }
-            else if (rhs(r) <= EPSILON){
-                printf("RHS(%d) has odd result: %f\n", r, rhs(r));
             }
         }
         if (maxi_pos == -1){            // 对应Ai这一列所有元素全部小于0，也即x可以随意增大，问题无界

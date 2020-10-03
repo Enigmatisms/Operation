@@ -22,6 +22,15 @@ public:
         memset(counter, 0, _m * sizeof(int));
     }
 
+    Simplex(Eigen::MatrixXd _cstrn):
+        constrain(_cstrn), _m(_cstrn.rows()), _n(_cstrn.cols() - 1), rhs(constrain.col(_n))
+    {
+        loop_cnt = 0;
+        artifacts = 0;
+        counter = new int[_m];
+        memset(counter, 0, _m * sizeof(int));
+    }
+
     ~Simplex(){
         delete[] counter;
     }
