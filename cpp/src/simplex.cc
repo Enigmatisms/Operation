@@ -120,14 +120,9 @@ bool Simplex::doubleStageSolve(const Eigen::RowVectorXd& tar){
     }
     
     // 此数组用于判断哪些行对应了人工变量，对应人工变量的都需要出基
-    bool* is_artifacts = new bool[_m];              // 对应行包含的单位列向量为1的分量是否为人工变量
     for (int row = 0; row < _m; row ++){
         if (selected.find(row) == selected.end()){  // 没有加入的变量为人工变量
             target += constrain.row(row);           // 人工变量对应没有选中的行，则化人工变量（基）的检验数为0
-            is_artifacts[row] = true;
-        }
-        else{
-            is_artifacts[row] = false;
         }
     }
     std::unordered_set<int> artis;
