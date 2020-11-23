@@ -30,7 +30,7 @@ class RG:
         p[bidx] = - invBN @ pn
         return p
 
-    def solve(self, initial, max_iter = 32, criteria = 1e-6):
+    def solve(self, initial, max_iter = 256, criteria = 1e-6):
         pos = []
         x = Var(initial.reshape(-1, 1), requires_grad = True)
         for i in range(max_iter):
@@ -66,7 +66,7 @@ class RG:
             if not t_changed:
                 print("Step could be infinite. Minimum is neg-inifinite.")
                 return x.data.numpy()
-            print("Max t = ", max_t)
+            print("Max t = ", max_t, i)
             t = min(Armijo(self.func, x.data[:2], p[:2]), max_t)
             x.data += t * p
             print(x.view(-1), t)

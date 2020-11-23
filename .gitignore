@@ -1,5 +1,9 @@
+*.xls
+*.bin
 */*.db
 *.db
+*/*.xls
+*/*.bin
 */build/
 /build/
 .vscode/
