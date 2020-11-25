@@ -4,6 +4,8 @@
 *.db
 */*.xls
 */*.bin
+*/*.txt
+*/*.png
 */build/
 /build/
 .vscode/

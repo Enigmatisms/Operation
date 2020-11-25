@@ -41,9 +41,8 @@ class Ant:
         self.last_cost = 0
 
     def calculate(self, adjs:np.array):
-        length = len(adjs)
-        for i in range(length):
-            self.last_cost += adjs[self.path[i]][self.path[(i + 1) % length]]
+        for i in range(self.city):
+            self.last_cost += adjs[self.path[i]][self.path[(i + 1) % self.city]]
         return self.last_cost, self.path
 
     # 作用于外激素矩阵
@@ -54,8 +53,6 @@ class Ant:
 
     def back2Start(self):
         self.now_pos = self.start
-        if not len(self.plausible) == 0:
-            raise ValueError("Plausible set is somehow not yet cleared.")
         self.path.append(self.start)
 
 
@@ -78,17 +75,18 @@ class BasicACO:
         for i in range(ants):
             self.ants[i].initialize(city)
 
+        self.prefix = self.adjs ** ( - self.b)
+        self.probs = np.zeros_like(self.prefix)
+
     # 输入蚂蚁的index 输出list 一个对应于index蚂蚁的周围可选路径的概率
     # 输出可选路径
     def choiceForAnt(self, index):
-        pl = []
-        prob = []
-        pos = self.ants[index].now_pos
+        ant = self.ants[index]
+        pos = ant.now_pos
         pl = list(self.ants[index].plausible)
-        # 改为 (self.phm[pos][c])**self.a * (self.adjs[pos][c]) ** (-self.b) 进行预计算
         # 列表生成式的profile结果非常差
-        prob = np.array([(self.phm[pos][c])**self.a * (self.adjs[pos][c]) ** (-self.b) for c in pl])
-        return pl, prob
+        prob = self.probs[pos][pl]
+        return pl, list(prob)
 
     # 只在全局周游一次结束后，才开始计算外激素挥发以及分泌
     def updateSecretion(self):
@@ -99,6 +97,7 @@ class BasicACO:
     # 所有蚂蚁进行一次周游
     def randomWander(self):
         for _it in range(self.max_iter):        # 最外层循环（周游次数）
+            self.probs = (self.phm ** self.a) * self.prefix
             for k in range(self.city):          # 周游循环
                 for i in range(self.ant_num):   # 对每个蚂蚁进行循环
                     if k == self.city - 1:
@@ -116,10 +115,10 @@ class BasicACO:
             self.updateSecretion()
             for i in range(self.ant_num):
                 self.ants[i].reset()
-            # print("Iter %d / %d"%(_it, self.max_iter))
+            print("Iter %d / %d"%(_it, self.max_iter))
         self.shortest = self.exchange(self.shortest)
-        # print(self.shortest)
-        # print("Random wader(%d ants) for %d times completed."%(self.ant_num, self.max_iter))
+        print(self.shortest)
+        print("Random wader(%d ants) for %d times completed."%(self.ant_num, self.max_iter))
     
     def optimize(self, arr:list):
         result = dcp(arr)
@@ -155,13 +154,14 @@ class BasicACO:
         plt.ylabel("最短路径长度")
         plt.title("蚁群算法迭代情况")
         plt.legend()
-        plt.show()
+        plt.savefig(".\\fig.png")
+        # plt.show()
 
 if __name__ == "__main__":
     plt.rcParams['font.sans-serif'] = ['SimHei'] # 指定默认字体
     plt.rcParams['axes.unicode_minus'] = False
     plt.rcParams['font.size'] = 16
-    aco = BasicACO(107, max_iter = 3, ants = 50)
+    aco = BasicACO(107, max_iter = 2, ants = 200)
     # aco.randomWander()
     profile.run("aco.randomWander()")
     aco.draw()
