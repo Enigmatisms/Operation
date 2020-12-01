@@ -17,14 +17,18 @@ typedef struct Stack{       // 大小为120的栈, uint8_t不够表示所有的�
 
 /// @todo 初始化时188堵墙，计算是否正确？
 extern uint8_t range;        // 取余范围
+extern uint8_t map[1024];
 extern uint8_t backGround[512];   // 复用一下吧
 extern uint rand_seed;              // 随机数种子
 extern stack searches;              
 extern short steps[4];
 extern short walls[188];           // 需要检查或是打通的墙壁（此处需要检查）
+extern uint8_t xp;
+extern uint8_t yp;
 
 void stackInit(stack* st);
 void stackPush(stack* st, short val);
+void printDebug();
 short stackPop(stack* st);
 // ================= 栈模块结束 ==================//
 
@@ -40,5 +44,9 @@ void breakWalls();
 
 /// 合并连通支（使用栈）
 void mergeBranch(short wpos, uint8_t min_val);
+
+void move(uint8_t dir);
+
+void setPosOnGraph(uint8_t clear);
 
 #endif  //__KRUSCAL_H__
