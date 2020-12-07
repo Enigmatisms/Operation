@@ -3,10 +3,12 @@
 */*.db
 *.db
 */*.xls
+*/*.xlsx
 */*.bin
 */*.txt
 */*.png
 */build/
+*/output/
 /build/
 .vscode/
 */__pycache__/

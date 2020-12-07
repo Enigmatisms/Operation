@@ -30,6 +30,7 @@ class Genetic:
         染色体构造：type = list, 十进制编码，其中设置了m - 1个虚拟位点
         交叉模式：THSP 启发式虚拟点交叉
         适应度函数：需要另行构造，由于其中涉及到充电的时间，相当于存在与策略相关的点权
+        population中为什么会存在-1？（costFunc计算）
     """
     def __init__(self, city, m = 4, p_mut = 0.01, p_crs = 2 / 3, max_iter = 500, pop = 60):
         self.m = m
@@ -53,14 +54,19 @@ class Genetic:
 
         self.total_costs = np.zeros((self.max_iter + 1))
         self.number_of_cluster = 0
+        temp = np.fromfile('.\\pos.bin')
+        temp = temp.reshape((city, 2))
+        self.xs = temp[:, 0]
+        self.ys = temp[:, 1]
 
     def reset(self):
         self.cost_sum = 0
         self.costs = np.array([])
-        self.population.clear()
+        # self.population.clear()
         self.generatePopulation()
         
         self.number_of_cluster += 1
+        # print(self.iter_costs)
         self.total_costs += np.array(self.iter_costs)
         self.iter_costs.clear()
     
@@ -96,11 +102,12 @@ class Genetic:
         return new
 
     # 代价函数（评价使用的适应性函数）
+    # todo: 为什么会有-1这种东西？
     def costFunc(self, ind):
         cost = 0
         for i in range(1, self.city):
+            # print("%d, %d: %f"%(ind[i-1], ind[i], self.adjs[ind[i-1]][ind[i]]))
             cost += self.adjs[ind[i - 1]][ind[i]]
-        cost += self.adjs[ind[-1]][0]
         self.cost_sum += cost
         return cost
 
@@ -161,12 +168,12 @@ class Genetic:
             return False
         for gene in ind[1:]:
             if gene < 1:
-                if cnt < 3:         # 两个旅行商之间的路径长度为 1 或者 0 则为致死的基因型，会被替换
+                if cnt < 31:         # 两个旅行商之间的路径长度为 1 或者 0 则为致死的基因型，会被替换
                     return False
                 cnt = 0
             else:
                 cnt += 1
-        if cnt < 3:
+        if cnt < 30:
             return False
         return True
 
@@ -217,7 +224,7 @@ class Genetic:
             for i in range(3):                  
                 # 开头一致后，下一个值中, 到new[-1]也即上一个路径点，找出(距离最小)的对应点
                 pos = lst[i][0]
-                if self.adjs[new[-1]][pos] < _min and not pos in selected:    # 未选择过
+                if not pos in selected and self.adjs[new[-1]][pos] < _min:    # 未选择过
                     _min = self.adjs[new[-1]][pos]
                     mini = pos
             # 最后找到的mini为距离上一次加入点最近的点
@@ -242,9 +249,8 @@ class Genetic:
         inds = sorted(list(zip(self.costs, self.population)))
         return inds[0]
 
-    # 交换法：对已经得到的四个圈进行最优化
+    # 交换法：对已经得到的两个圈进行最优化
     def optimize(self, arr:list):
-        length = len(arr)
         result = dcp(arr)
         self.exchange(result)
         temp = deque(result)
@@ -283,30 +289,30 @@ class Genetic:
         return paths
         
     def draw(self, paths):
-        # for i in range(len(paths)):
-        #     dist = 0
-        #     path_len = len(paths[i])
-        #     for j in range(path_len):
-        #         x1 = paths[i][j]
-        #         x2 = paths[i][(j + 1) % path_len]
-        #         dist += self.adjs[x1][x2]
-        #     print("路径(%d) 长度为： %f"%(i, dist), paths[i])
-        #     plt.plot(
-        #         self.xs[paths[i]], 
-        #         self.ys[paths[i]],
-        #         color = colors[i],
-        #         linestyle = linestyles[i],
-        #         label = "路径 %d"%(i)
-        #     )
-        # plt.scatter(self.xs, self.ys, label = "传感器位置")
-        # for i in range(len(self.xs)):
-        #     plt.annotate(i, xy = (self.xs[i], self.ys[i]), xytext = (self.xs[i] + 0.01, self.ys[i] + 0.01))
-        # plt.xlabel("经度（转为距离）/KM")
-        # plt.ylabel("纬度（转为距离）/KM")
-        # plt.title("%d车遗传算法优化模型"%(self.m))
-        # plt.legend()
+        for i in range(len(paths)):
+            dist = 0
+            path_len = len(paths[i])
+            for j in range(path_len):
+                x1 = paths[i][j]
+                x2 = paths[i][(j + 1) % path_len]
+                dist += self.adjs[x1][x2]
+            print("路径(%d) 长度为： %f"%(i, dist), paths[i])
+            plt.plot(
+                self.xs[paths[i]], 
+                self.ys[paths[i]],
+                color = colors[i],
+                linestyle = linestyles[i],
+                label = "路径 %d"%(i)
+            )
+        plt.scatter(self.xs, self.ys, label = "城市位置")
+        for i in range(len(self.xs)):
+            plt.annotate(i, xy = (self.xs[i], self.ys[i]), xytext = (self.xs[i] + 0.01, self.ys[i] + 0.01))
+        plt.xlabel("经度（转为距离）/KM")
+        plt.ylabel("纬度（转为距离）/KM")
+        plt.title("%d旅行商遗传算法优化模型"%(self.m))
+        plt.legend()
 
-        # plt.figure(2)
+        plt.figure(2)
         self.total_costs /= self.number_of_cluster
         xs = np.arange(self.max_iter + 1)
         plt.plot(xs, self.total_costs, color = "black")
@@ -314,7 +320,7 @@ class Genetic:
         plt.xlabel("代数/代")
         plt.ylabel("劣质基因表达分数（越低越优）")
         plt.title("遗传算法收敛情况")
-        plt.legend()
+        print(paths)
 
         plt.show()
 
@@ -326,9 +332,9 @@ if __name__  == "__main__":
     results = []
     # 对6个不同种群，每个种群的大小为 pop, 迭代 max_iter 代 取6个种群的最优
     paths = []
-    ga = Genetic(107, p_mut = 0.1, p_crs = 2/3, max_iter = 600, pop = 300, m = 2)
+    ga = Genetic(107, p_mut = 0.3, p_crs = 2/3, max_iter = 360, pop = 320, m = 2)
     if not do_profile:
-        for i in range(5):
+        for i in range(1):
             results.append(ga.iteration())
             ga.reset()
         results = min(results)
